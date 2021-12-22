@@ -1,0 +1,9 @@
+Connect to polygon for live crypto data
+wscat -c wss://socket.polygon.io/crypto
+wscat -c wss://alpaca.socket.polygon.io/crypto
+
+To interact with web socket: Publish JSON messages and it will interact back
+{"action":"auth", "params": "Your alpaca Key"}
+
+To get data based on certain crypto
+{"action":"subscribe", "params":"Q.BTCUSD"}
