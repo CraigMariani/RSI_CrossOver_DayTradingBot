@@ -1,5 +1,5 @@
 
-from alpaca_trade_api.rest import TimeFrame
+# from alpaca_trade_api.rest import TimeFrame
 import time
 import numpy as np
 import pandas as pd
@@ -8,7 +8,7 @@ from secret import Secret
 # from get_data import Get_Data
 import alpaca_trade_api as tradeapi
 import datetime as dt
-import pytz
+
 class Bot:
 
     def __init__(self):
@@ -54,7 +54,7 @@ class Bot:
         df.dropna(inplace=True)
 
         # upper and lower bounds of the rsi trading signal
-        upper_bound = 65
+        upper_bound = 50
         lower_bound = 25
 
         # # calculate buy and sell signals depending on the upper and lower bounds
@@ -68,14 +68,17 @@ class Bot:
         for ticker in tickers:
             now = dt.datetime.today()
             now = now.strftime("%Y-%m-%d")
-            data = self.api.get_crypto_bars(ticker, TimeFrame.Minute, now, now).df
-            data = data[data['exchange'] == 'CBSE']
-
+            data = self.api.get_crypto_bars(ticker, tradeapi.rest.TimeFrame.Minute, now, now).df
+            # print(data.head())
+            try:
+                data = data[data['exchange'] == 'CBSE']
+            except Exception as e:
+                print(e)
             data = Bot.calculate_cross_over(self, data)
             data = Bot.calculate_rsi(self, data)
             
             data['buy'] = np.where((data['upper_bound'] == 1) & (data['golden_cross'] == 1), 1, 0)
-            data['sell'] = np.where((data['lower_bound'] == 1) & (data['death_cross'] == 1), 1, 0)
+            # data['sell'] = np.where((data['lower_bound'] == 1) & (data['death_cross'] == 1), 1, 0)
 
             data.to_csv('data/{}.csv'.format(ticker))
     
@@ -83,50 +86,28 @@ class Bot:
 
         api = self.api
         current = df.iloc[len(df.index) - 2]
-        # print(current)
-        # print(df.iloc[2])
-        buy_df = df[df['buy'] == 1]
-        sell_df = df[df['sell'] == 1]
 
-        current_time = dt.datetime.now(pytz.utc) # current time
-        current_stamp = pd.Timestamp(current_time, tz=None) # current time stamp
         
         try:
-            
-            latest_buy = buy_df.iloc[-1]
-            buy_stamp = pd.Timestamp(latest_buy['timestamp'], tz=None) # timestamp of latest buy signal
-            buy_time = buy_stamp - current_stamp
+            if current['buy'] == 1: # using the most recent buy signal
+                
+                    print('buy: {}'.format(ticker))
+                    api.submit_order(symbol=ticker, 
+                                    side='buy',
+                                    type='market', 
+                                    # qty=1, # for buying a part of a BTC
 
-            latest_sell = sell_df.iloc[-1]
-            sell_stamp = pd.Timestamp(latest_buy['timestamp'], tz=None) # timestamp of latest sell signal
-            sell_time = sell_stamp - current_stamp
-
-            if buy_time < sell_time:
-                print('buy: {}'.format(ticker))
-                api.submit_order(symbol=ticker, 
-                                side='buy',
-                                type='market', 
-                                # qty=1, # for buying a part of a BTC
-                                notional= 100, # for buying a fixed USD price amount of BTC 
-                                
-                                # stop_loss={'stop_price' : current['close'] - (current['close'] * .3)} # price drops below 30 percent of current closing price = exit position
-                                
-                                stop_loss={'stop_price' : current['close']}, # stoploss at current closing price
-                                take_profit={'limit_price': current['close'] + (current['close'] * .35)} # take profit at 35 percent over the current closing price
-
-                                ) 
-                                   
+                                    # every order should be 5%-10% of your total portfolio
+                                    notional=50, # for buying a fixed USD price amount of BTC 
                                     
-            # for shorting, this doesn't apply to crypto    
-            # if sell_time < buy_time:
-            #     print('sell')
-            #     api.submit_order(symbol=ticker, 
-            #                     side='sell',
-            #                     type='market',
-            #                     qty=1)
+                                    # stop_loss={'stop_price' : current['close'] - (current['close'] * .3)} # price drops below 30 percent of current closing price = exit position
+                                    
+                                    stop_loss={'stop_price' : current['close'] - (current['close'] * .01)}, # stoploss at 1 percent current closing price
+                                    take_profit={'limit_price': current['close'] + (current['close'] * .02)} # take profit at 2 percent over the current closing price
+                                    ) 
 
         except Exception as e:
-            # print('Error with signals. No buy or sell signals')
+            print('Failed to buy {}'.format(ticker))
             print(e)
 
 
@@ -149,5 +130,5 @@ if __name__ == '__main__':
         
         bot = Bot()
         bot.main()
-        time.sleep(1800)
+        time.sleep(60)
 

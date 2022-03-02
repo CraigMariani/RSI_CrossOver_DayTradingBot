@@ -2,5 +2,4 @@ alpaca-trade-api==1.4.3
 DateTime==4.3
 pandas==1.1.0
 numpy==1.19.5
-pytz==2021.1
 jsonschema==3.2.0
